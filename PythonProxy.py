@@ -139,9 +139,10 @@ class ConnectionHandler:
         self._connect_target(host)
 
         #TO DO: first find out the Content-Length by sending a RANGE request
+	self.target.send('HEAD %s %s\n'%(path, self.protocol)+self.client_buffer)
+	print("sending HEAD\n") #DEBUG
 
-        self.target.send('%s %s %s\n'%(self.method, path, self.protocol)+
-                         self.client_buffer)
+        self.target.send('%s %s %s\n'%(self.method, path, self.protocol)+self.client_buffer)
         #TO DO: need to send another request to "target2" that GETs a different range of bytes
 
         self.client_buffer = ''
@@ -179,9 +180,9 @@ class ConnectionHandler:
                         out = self.client
                     if data:
                         #TO DO: Check if it's response to the RANGE request and extract the Content-Length
-
+			
                         #TO DO: merge the data from both interfaces into one big data, if we are receiving
-
+			print(data) #debug
                         out.send(data)
                         count = 0
             if count == time_out_max:
