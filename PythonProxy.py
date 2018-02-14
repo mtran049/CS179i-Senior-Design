@@ -183,8 +183,11 @@ class ConnectionHandler:
                     if data:
                         #TO DO: Check if it's response to the RANGE request and extract the Content-Length
 			range_test = data.find('Content-Length')
-			if range_test != -1:
-				print 'Content-Length: ' + data[range_test + 16:data.find('Accept-Ranges')]
+			if range_test > 0:
+				content_length = data[range_test + 16:data.find('Accept-Ranges')]
+				print 'Content-Length: ' + content_length
+			else:
+				print 'Not a RANGE request'
 			
                         #TO DO: merge the data from both interfaces into one big data, if we are receiving
 			print(data) #debug
