@@ -93,6 +93,9 @@ class ConnectionHandler:
         self.client = connection
         self.client_buffer = ''
         self.timeout = timeout
+	#merger1 and merger2 used to merge data in read_write function
+	self.merger1 = ''
+	self.merger2 = ''
         
         #print the request and it extracts the protocol and path
         self.method, self.path, self.protocol = self.get_base_header()
@@ -144,7 +147,9 @@ class ConnectionHandler:
 	#self.target.send('HEAD %s %s\n'%(path, self.protocol)+self.client_buffer)
 	#print("sending HEAD\n") #DEBUG
 
+        print ('%s %s %s\n'%(self.method, path, self.protocol)+self.client_buffer)
         self.target.send('%s %s %s\n'%(self.method, path, self.protocol)+self.client_buffer)
+        self.target2.send('%s %s %s\n'%(self.method, path, self.protocol)+self.client_buffer)
         #TO DO: need to send another request to "target2" that GETs a different range of bytes
 
         self.client_buffer = ''
@@ -161,12 +166,14 @@ class ConnectionHandler:
             port = 80
         (soc_family, _, _, _, address) = socket.getaddrinfo(host, port)[0]
         self.target = socket.socket(soc_family)
+	self.target2 = socket.socket(soc_family)
         self.target.connect(address)
+	self.target2.connect(address)
 
     #"revolving door" to re-direct the packets in the right direction
     def _read_write(self):
         time_out_max = self.timeout/3
-        socs = [self.client, self.target]
+        socs = [self.client, self.target, self.target2]
         count = 0
         while 1:
             count += 1
@@ -190,8 +197,24 @@ class ConnectionHandler:
 				print 'Not a RANGE request'
 			
                         #TO DO: merge the data from both interfaces into one big data, if we are receiving
-			print(data) #debug
-                        out.send(data)
+			if out == self.client:
+				if in_ == self.target:
+					self.merger1 = data
+					print 'merger 1'
+					print data
+				elif in_ == self.target2:
+					self.merger2 = data
+					print 'merger 2'
+					print data
+				if self.merger1 != '' and self.merger2 != '':
+					data = self.merger1 + self.merger2
+					print(data)
+					out.send(data)
+					self.merger1 = ''
+					self.merger2 = ''
+			else:
+				print(data) #debug
+                        	out.send(data)
                         count = 0
             if count == time_out_max:
                 break
