@@ -199,13 +199,13 @@ class ConnectionHandler:
                         #TO DO: merge the data from both interfaces into one big data, if we are receiving
 			if out == self.client:
 				if in_ == self.target:
-					self.merger1 = data
-					print 'merger 1'
-					print data
+					self.merger1 = data[:-4] + '\n'
+					#print 'merger 1'
+					#print data
 				elif in_ == self.target2:
 					self.merger2 = data
-					print 'merger 2'
-					print data
+					#print 'merger 2'
+					#print data
 				if self.merger1 != '' and self.merger2 != '':
 					data = self.merger1 + self.merger2
 					print(data)
@@ -213,7 +213,7 @@ class ConnectionHandler:
 					self.merger1 = ''
 					self.merger2 = ''
 			else:
-				print(data) #debug
+				#print(data) #debug
                         	out.send(data)
                         count = 0
             if count == time_out_max:
