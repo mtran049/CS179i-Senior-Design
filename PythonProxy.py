@@ -96,6 +96,7 @@ class ConnectionHandler:
 	#merger1 and merger2 used to merge data in read_write function
 	self.merger1 = ''
 	self.merger2 = ''
+	self.content_length = 0
         
         #print the request and it extracts the protocol and path
         self.method, self.path, self.protocol = self.get_base_header()
@@ -147,7 +148,7 @@ class ConnectionHandler:
 	#self.target.send('HEAD %s %s\n'%(path, self.protocol)+self.client_buffer)
 	#print("sending HEAD\n") #DEBUG
 
-        print ('%s %s %s\n'%(self.method, path, self.protocol)+self.client_buffer)
+        print ('%s %s %s\n'%(self.method, path, self.protocol)+'Range: bytes = 0 - %d\n'%(self.content_length,)+self.client_buffer)
         self.target.send('%s %s %s\n'%(self.method, path, self.protocol)+self.client_buffer)
         self.target2.send('%s %s %s\n'%(self.method, path, self.protocol)+self.client_buffer)
         #TO DO: need to send another request to "target2" that GETs a different range of bytes
@@ -200,12 +201,8 @@ class ConnectionHandler:
 			if out == self.client:
 				if in_ == self.target:
 					self.merger1 = data[:-4] + '\n'
-					#print 'merger 1'
-					#print data
 				elif in_ == self.target2:
 					self.merger2 = data
-					#print 'merger 2'
-					#print data
 				if self.merger1 != '' and self.merger2 != '':
 					data = self.merger1 + self.merger2
 					print(data)
