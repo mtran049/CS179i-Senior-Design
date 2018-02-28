@@ -145,18 +145,22 @@ class ConnectionHandler:
         #TO DO: first find out the Content-Length by sending a RANGE request
 	
 	#testing RANGE request
-	self.target.send('HEAD %s %s\n'%(path, self.protocol)+self.client_buffer)
-	print("sending HEAD\n") #DEBUG
+	temp_method = self.method
+	self.method = 'HEAD'
+	self.target.send('%s %s %s\n'%(self.method, path, self.protocol)+self.client_buffer)
+	print("sending HEAD") #DEBUG
 	self._read_write()
+	self.method = temp_method
 
-        print ('%s %s %s\n'%(self.method, path, self.protocol)+'Range: bytes = 0 - %d\n'%(self.content_length,)+self.client_buffer)
-        self.target.send('%s %s %s\n'%(self.method, path, self.protocol)+self.client_buffer)
-        self.target2.send('%s %s %s\n'%(self.method, path, self.protocol)+self.client_buffer)
+        #print ('%s %s %s\n'%(self.method, path, self.protocol)+'Range: bytes = 0 - %d\n'%(int(self.content_length),)+self.client_buffer)
+        self.target.send('%s %s %s\n'%(self.method, path, self.protocol)+ 'Range: bytes=0-50\n'+self.client_buffer)
+        self.target2.send('%s %s %s\n'%(self.method, path, self.protocol)+ 'Range: bytes=0-50\n'+self.client_buffer)
         #TO DO: need to send another request to "target2" that GETs a different range of bytes
 
         self.client_buffer = ''
 
         #start the read/write function
+	print 'Start second read write'
         self._read_write()
 
     def _connect_target(self, host):
@@ -193,11 +197,14 @@ class ConnectionHandler:
                         out = self.client
                     if data:
                         #Check if it's response to the RANGE request and extract the Content-Length
-			range_test = data.find('Content-Length')
-			if range_test > 0:
+			print self.method
+			if self.method == 'HEAD':
+				range_test = data.find('Content-Length')
 				self.content_length = data[range_test + 16:data.find('Accept-Ranges')]
 				print 'Content-Length: ' + self.content_length
-
+				print (data)
+				out.send(data)
+				return
 			#If it is not a RANGE request, merge the recieved data from both interfaces
 			else:
 				print 'Not a RANGE request'
