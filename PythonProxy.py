@@ -145,8 +145,9 @@ class ConnectionHandler:
         #TO DO: first find out the Content-Length by sending a RANGE request
 	
 	#testing RANGE request
-	#self.target.send('HEAD %s %s\n'%(path, self.protocol)+self.client_buffer)
-	#print("sending HEAD\n") #DEBUG
+	self.target.send('HEAD %s %s\n'%(path, self.protocol)+self.client_buffer)
+	print("sending HEAD\n") #DEBUG
+	self._read_write()
 
         print ('%s %s %s\n'%(self.method, path, self.protocol)+'Range: bytes = 0 - %d\n'%(self.content_length,)+self.client_buffer)
         self.target.send('%s %s %s\n'%(self.method, path, self.protocol)+self.client_buffer)
@@ -177,9 +178,11 @@ class ConnectionHandler:
         socs = [self.client, self.target, self.target2]
         count = 0
         while 1:
+	    print count
             count += 1
             (recv, _, error) = select.select(socs, [], socs, 3)
             if error:
+		print 'ERROR: broke out of read_write'
                 break
             if recv:
                 for in_ in recv:
@@ -189,31 +192,32 @@ class ConnectionHandler:
                     else:
                         out = self.client
                     if data:
-                        #TO DO: Check if it's response to the RANGE request and extract the Content-Length
+                        #Check if it's response to the RANGE request and extract the Content-Length
 			range_test = data.find('Content-Length')
 			if range_test > 0:
-				content_length = data[range_test + 16:data.find('Accept-Ranges')]
-				print 'Content-Length: ' + content_length
+				self.content_length = data[range_test + 16:data.find('Accept-Ranges')]
+				print 'Content-Length: ' + self.content_length
+
+			#If it is not a RANGE request, merge the recieved data from both interfaces
 			else:
 				print 'Not a RANGE request'
-			
-                        #TO DO: merge the data from both interfaces into one big data, if we are receiving
-			if out == self.client:
-				if in_ == self.target:
-					self.merger1 = data[:-4] + '\n'
-				elif in_ == self.target2:
-					self.merger2 = data
-				if self.merger1 != '' and self.merger2 != '':
-					data = self.merger1 + self.merger2
-					print(data)
-					out.send(data)
-					self.merger1 = ''
-					self.merger2 = ''
-			else:
-				#print(data) #debug
-                        	out.send(data)
+				if out == self.client:
+					if in_ == self.target:
+						self.merger1 = data[:-4] + '\n'
+					elif in_ == self.target2:
+						self.merger2 = data
+					if self.merger1 != '' and self.merger2 != '':
+						data = self.merger1 + self.merger2
+						print(data)
+						out.send(data)
+						self.merger1 = ''
+						self.merger2 = ''
+				else:
+					#print(data) #debug
+                        		out.send(data)
                         count = 0
             if count == time_out_max:
+		print 'BROKE OUT OF LOOP'
                 break
 
 #start the proxy server and listen for connections on port 8080
