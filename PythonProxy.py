@@ -97,6 +97,9 @@ class ConnectionHandler:
 	self.merger1 = ''
 	self.merger2 = ''
 	self.content_length = 0
+	self.range1 = ''
+	self.range2 = ''
+
         
         #print the request and it extracts the protocol and path
         self.method, self.path, self.protocol = self.get_base_header()
@@ -153,8 +156,12 @@ class ConnectionHandler:
 	self.method = temp_method
 
         #print ('%s %s %s\n'%(self.method, path, self.protocol)+'Range: bytes = 0 - %d\n'%(int(self.content_length),)+self.client_buffer)
-        self.target.send('%s %s %s\n'%(self.method, path, self.protocol)+ 'Range: bytes=0-50\n'+self.client_buffer)
-        self.target2.send('%s %s %s\n'%(self.method, path, self.protocol)+ 'Range: bytes=0-50\n'+self.client_buffer)
+	#DEBUGGING REQUESTS#
+	print('%s %s %s\n'%(self.method, path, self.protocol) + self.range1 + self.client_buffer)
+	print('%s %s %s\n'%(self.method, path, self.protocol) + self.range2 + self.client_buffer)
+
+        self.target.send('%s %s %s\n'%(self.method, path, self.protocol) + self.range1 + self.client_buffer)
+        self.target2.send('%s %s %s\n'%(self.method, path, self.protocol) + self.range2 + self.client_buffer)
         #TO DO: need to send another request to "target2" that GETs a different range of bytes
 
         self.client_buffer = ''
@@ -201,7 +208,15 @@ class ConnectionHandler:
 			if self.method == 'HEAD':
 				range_test = data.find('Content-Length')
 				self.content_length = data[range_test + 16:data.find('Accept-Ranges')]
-				print 'Content-Length: ' + self.content_length
+				self.content_length = self.content_length[:-2]
+				#print('DEBUGGING:' + self.content_length) 
+
+				self.range1 = 'Range: bytes=0-' + str(int(self.content_length)/2 - 1) + '\n'
+				self.range2 = 'Range: bytes=' + str(int(self.content_length)/2) + '-' + self.content_length + '\n'
+				
+				print 'range 1: ' + self.range1
+				print 'range 2: ' + self.range2
+				
 				print (data)
 				out.send(data)
 				return
