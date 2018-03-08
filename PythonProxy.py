@@ -209,7 +209,6 @@ class ConnectionHandler:
 				range_test = data.find('Content-Length')
 				self.content_length = data[range_test + 16:data.find('Accept-Ranges')]
 				self.content_length = self.content_length[:-2]
-				#print('DEBUGGING:' + self.content_length) 
 
 				self.range1 = 'Range: bytes=0-' + str(int(self.content_length)/2 - 1) + '\n'
 				self.range2 = 'Range: bytes=' + str(int(self.content_length)/2) + '-' + self.content_length + '\n'
@@ -225,13 +224,19 @@ class ConnectionHandler:
 				print 'Not a RANGE request'
 				if out == self.client:
 					if in_ == self.target:
-						self.merger1 = data[:-4] + '\n'
+						if self.merger1 == '':
+							data = self.remove_header(data)
+						self.merger1 = self.merger1 + data
 					elif in_ == self.target2:
-						self.merger2 = data
-					if self.merger1 != '' and self.merger2 != '':
-						data = self.merger1 + self.merger2
-						print(data)
-						out.send(data)
+						if self.merger2 == '':
+							data = self.remove_header(data)
+						self.merger2 = self.merger2 + data
+					if str(len(self.merger1) + len(self.merger2)) == str(self.content_length):
+						print '(DEBUG) Data merged'
+						self.merger1 = self.merger1[:-4] + '\n'
+						data = 'HTTP/1.1 200 OK\r\n\r\n' + self.merger1 + self.merger2
+						print data[:200]
+						#out.send(data)
 						self.merger1 = ''
 						self.merger2 = ''
 				else:
@@ -241,6 +246,10 @@ class ConnectionHandler:
             if count == time_out_max:
 		print 'BROKE OUT OF LOOP'
                 break
+
+    def remove_header(self, input_data):
+	index = input_data.find('\r\n\r\n')
+	return input_data[index + 4:]
 
 #start the proxy server and listen for connections on port 8080
 def start_server(host='localhost', port=8080, IPv6=False, timeout=60,
