@@ -189,8 +189,8 @@ class ConnectionHandler:
         socs = [self.client, self.target, self.target2]
         count = 0
         while 1:
-	    print count
-            count += 1
+	    #print count
+            #count += 1
             (recv, _, error) = select.select(socs, [], socs, 3)
             if error:
 		print 'ERROR: broke out of read_write'
@@ -210,8 +210,8 @@ class ConnectionHandler:
 				self.content_length = data[range_test + 16:data.find('Accept-Ranges')]
 				self.content_length = self.content_length[:-2]
 
-				self.range1 = 'Range: bytes=0-' + str(int(self.content_length)/2 - 1) + '\n'
-				self.range2 = 'Range: bytes=' + str(int(self.content_length)/2) + '-' + self.content_length + '\n'
+				self.range1 = 'Range: bytes=0-' + str(int(self.content_length)/2) + '\n'
+				self.range2 = 'Range: bytes=' + str(int(self.content_length)/2 + 1) + '-\n'
 				
 				print 'range 1: ' + self.range1
 				print 'range 2: ' + self.range2
@@ -233,22 +233,22 @@ class ConnectionHandler:
 						self.merger2 = self.merger2 + data
 					if str(len(self.merger1) + len(self.merger2)) == str(self.content_length):
 						print '(DEBUG) Data merged'
-						self.merger1 = self.merger1[:-4] + '\n'
-						data = 'HTTP/1.1 200 OK\r\n\r\n' + self.merger1 + self.merger2
+						data = self.merger1 + self.merger2 + 'HTTP/1.1 200 OK\r\n\r\n'
 						print data[:200]
-						#out.send(data)
+						out.send(data)
 						self.merger1 = ''
 						self.merger2 = ''
 				else:
 					#print(data) #debug
                         		out.send(data)
-                        count = 0
-            if count == time_out_max:
-		print 'BROKE OUT OF LOOP'
-                break
+                        		#count = 0
+            #if count == time_out_max:
+		#print 'BROKE OUT OF LOOP'
+                #break
 
     def remove_header(self, input_data):
 	index = input_data.find('\r\n\r\n')
+	print input_data[:index]
 	return input_data[index + 4:]
 
 #start the proxy server and listen for connections on port 8080
