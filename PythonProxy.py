@@ -81,7 +81,7 @@ Qual a diferença entre um proxy Elite, Anónimo e Transparente?
 
 """
 
-import socket, thread, select
+import socket, thread, select, re
 
 __version__ = '0.1.0 Draft 1'
 BUFLEN = 8192
@@ -90,33 +90,33 @@ HTTPVER = 'HTTP/1.1'
 
 class ConnectionHandler:
 	def __init__(self, connection, address, timeout):
-	self.client = connection
-	self.client_buffer = ''
-	self.timeout = timeout
-	#merger1 and merger2 used to merge data in read_write function
-	self.merger1 = ''
-	self.merger2 = ''
-	self.content_length = 0
-	self.range1 = ''
-	self.range2 = ''
-
-		
-	#print the request and it extracts the protocol and path
-	self.method, self.path, self.protocol = self.get_base_header()
-
-
-	if self.method=='CONNECT':
-		self.method_CONNECT()
-
-	#handle the GET request
-	elif self.method in ('OPTIONS', 'GET', 'HEAD', 'POST', 'PUT',
-						 'DELETE', 'TRACE'):
-		self.method_others()
-
-	self.client.close()
-	self.target.close()
-	self.target2.close()
-
+		self.client = connection
+		self.client_buffer = ''
+		self.timeout = timeout
+		#merger1 and merger2 used to merge data in read_write function
+		self.merger1 = ''
+		self.merger2 = ''
+		self.content_length = 0
+		self.range1 = ''
+		self.range2 = ''
+	
+			
+		#print the request and it extracts the protocol and path
+		self.method, self.path, self.protocol = self.get_base_header()
+	
+	
+		if self.method=='CONNECT':
+			self.method_CONNECT()
+	
+		#handle the GET request
+		elif self.method in ('OPTIONS', 'GET', 'HEAD', 'POST', 'PUT',
+							 'DELETE', 'TRACE'):
+			self.method_others()
+	
+		self.client.close()
+		self.target.close()
+		self.target2.close()
+	
 	def get_base_header(self):
 		while 1:
 			self.client_buffer += self.client.recv(BUFLEN)
@@ -151,19 +151,35 @@ class ConnectionHandler:
 		#testing RANGE request
 		temp_method = self.method
 		self.method = 'HEAD'
-		self.target.send('%s %s %s\n'%(self.method, path, self.protocol)+self.client_buffer)
+		self.target.send('%s %s %s\r\n'%(self.method, path, self.protocol)+self.client_buffer)
 		print("sending HEAD") #DEBUG
 		self._read_write()
 		self.method = temp_method
 
-		#print ('%s %s %s\n'%(self.method, path, self.protocol)+'Range: bytes = 0 - %d\n'%(int(self.content_length),)+self.client_buffer)
-		#DEBUGGING REQUESTS#
-		print('%s %s %s\n'%(self.method, path, self.protocol) + self.range1 + self.client_buffer)
-		print('%s %s %s\n'%(self.method, path, self.protocol) + self.range2 + self.client_buffer)
+		#prepare message1 and message2 for server in correct format
+		message1 = self.method + ' ' + path + ' ' + self.protocol + '\r\n'
+		message2 = self.method + ' ' + path + ' ' + self.protocol + '\r\n'
+		split_buff = self.client_buffer.split('\r\n')
+		for x in split_buff: #find Host first and removes from list
+			if x.find('Host') != -1:
+				message1 = message1 + x + '\r\n'
+				message2 = message2 + x + '\r\n'
+				split_buff.remove(x)
+		message1 = message1 + self.range1
+		message2 = message2 + self.range2
+		for x in split_buff:
+			if x != '':
+				message1 = message1 + x + '\r\n'
+				message2 = message2 + x + '\r\n'
+		message1 = message1 + '\r\n'
+		message2 = message2 + '\r\n'
+		
+		#DEBUGGING REQESTS#
+		print message1.split(' ')
+		print message2
 
-		self.target.send('%s %s %s\n'%(self.method, path, self.protocol) + self.range1 + self.client_buffer)
-		self.target2.send('%s %s %s\n'%(self.method, path, self.protocol) + self.range2 + self.client_buffer)
-		#TO DO: need to send another request to "target2" that GETs a different range of bytes
+		self.target.send(message1)
+		self.target2.send(message2)
 
 		self.client_buffer = ''
 
@@ -189,6 +205,8 @@ class ConnectionHandler:
 		time_out_max = self.timeout/3
 		socs = [self.client, self.target, self.target2]
 		count = 0
+		header1_flag = True
+		header2_flag = True
 		while 1:
 			(recv, _, error) = select.select(socs, [], socs, 3)
 			if error:
@@ -205,12 +223,12 @@ class ConnectionHandler:
 						#Check if it's response to the RANGE request and extract the Content-Length
 						print self.method
 						if self.method == 'HEAD':
-							range_test = data.find('Content-Length')
-							self.content_length = data[range_test + 16:data.find('Accept-Ranges')]
-							self.content_length = self.content_length[:-2]
+							split_data = re.split(' |\r\n', data)
+							content_index = split_data.index('Content-Length:')
+							self.content_length = split_data[content_index + 1]
 
-							self.range1 = 'Range: bytes=0-' + str(int(self.content_length)/2) + '\n'
-							self.range2 = 'Range: bytes=' + str(int(self.content_length)/2 + 1) + '-\n'
+							self.range1 = 'Range: bytes=0-' + str(int(self.content_length)/2) + '\r\n'
+							self.range2 = 'Range: bytes=' + str(int(self.content_length)/2 + 1) + '-' + self.content_length + '\r\n'
 
 							print 'range 1: ' + self.range1
 							print 'range 2: ' + self.range2
@@ -223,13 +241,19 @@ class ConnectionHandler:
 							print 'Not a RANGE request'
 							if out == self.client:
 								if in_ == self.target:
-									if self.merger1 == '':
-										data = self.remove_header(data)
-										self.merger1 = self.merger1 + data
+									if (self.merger1.find('\r\n\r\n') != -1) and header1_flag:
+										self.merger1 = self.remove_header(self.merger1)
+										header1_flag = False
+									self.merger1 = self.merger1 + data
 								elif in_ == self.target2:
-									if self.merger2 == '':
-										data = self.remove_header(data)
-										self.merger2 = self.merger2 + data
+									if (self.merger2.find('\r\n\r\n') != -1) and header2_flag:
+										self.merger2 = self.remove_header(self.merger2)
+										header2_flag = False
+									self.merger2 = self.merger2 + data
+								print 'Bytes Recieved:'
+								print len(self.merger1) + len(self.merger2)
+								print 'Bytes Needed:'
+								print self.content_length
 								if str(len(self.merger1) + len(self.merger2)) == str(self.content_length):
 									print '(DEBUG) Data merged'
 									data = self.merger1 + self.merger2 + 'HTTP/1.1 200 OK\r\n\r\n'
