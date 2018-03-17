@@ -197,6 +197,9 @@ class ConnectionHandler:
 		(soc_family, _, _, _, address) = socket.getaddrinfo(host, port)[0]
 		self.target = socket.socket(soc_family)
 		self.target2 = socket.socket(soc_family)
+		#TODO BIND SOCKETS TO INTERFACES
+		self.target.bind((wireless ip address, port number))
+		self.target2.bind((ethernet address, port number))
 		self.target.connect(address)
 		self.target2.connect(address)
 
